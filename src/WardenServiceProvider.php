@@ -3,15 +3,19 @@
 namespace Warden;
 
 use Illuminate\Support\ServiceProvider;
+use Warden\Commands\WardenBuildIndexCommand;
 use Warden\Commands\WardenInstallCommand;
 use Warden\Commands\WardenReindexCommand;
 use Warden\Commands\WardenStatusCommand;
 use Warden\Http\Middleware\ValidateWardenSharedKey;
 use Warden\Mcp\Servers\WardenServer;
+use Warden\Services\AstExtractor;
 use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
+use Warden\Services\EmbeddingClient;
 use Warden\Services\GitHistoryService;
 use Warden\Services\StagingDatabaseManager;
+use Warden\Services\VectorStore;
 use Warden\Services\WorktreeManager;
 
 class WardenServiceProvider extends ServiceProvider
@@ -56,6 +60,16 @@ class WardenServiceProvider extends ServiceProvider
                 config('warden.history')
             );
         });
+
+        $this->app->singleton(AstExtractor::class, function ($app) {
+            return new AstExtractor();
+        });
+
+        $this->app->singleton(EmbeddingClient::class, function ($app) {
+            return new EmbeddingClient(
+                config('warden.embeddings.model', 'text-embedding-3-small')
+            );
+        });
     }
 
     /**
@@ -89,6 +103,7 @@ class WardenServiceProvider extends ServiceProvider
                 WardenInstallCommand::class,
                 WardenStatusCommand::class,
                 WardenReindexCommand::class,
+                WardenBuildIndexCommand::class,
             ]);
         }
 

@@ -25,6 +25,8 @@ class WardenServiceProviderTest extends TestCase
         $this->assertTrue($this->app->bound(\Warden\Services\StagingDatabaseManager::class));
         $this->assertTrue($this->app->bound(\Warden\Services\DeepwikiClient::class));
         $this->assertTrue($this->app->bound(\Warden\Services\GitHistoryService::class));
+        $this->assertTrue($this->app->bound(\Warden\Services\AstExtractor::class));
+        $this->assertTrue($this->app->bound(\Warden\Services\EmbeddingClient::class));
     }
 
     public function test_commands_are_registered(): void
@@ -38,5 +40,6 @@ class WardenServiceProviderTest extends TestCase
         $this->assertArrayHasKey('warden:install', $commands);
         $this->assertArrayHasKey('warden:status', $commands);
         $this->assertArrayHasKey('warden:reindex', $commands);
+        $this->assertArrayHasKey('warden:build-index', $commands);
     }
 }
