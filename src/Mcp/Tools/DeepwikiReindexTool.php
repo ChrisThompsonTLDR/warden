@@ -30,7 +30,7 @@ class DeepwikiReindexTool
 
         try {
             // Run the reindex command
-            $exitCode = Artisan::call('deepwiki:reindex', [
+            $exitCode = Artisan::call('warden:reindex', [
                 'branch' => $branch,
                 '--force' => $force,
                 '--skip-history' => $skipHistory,

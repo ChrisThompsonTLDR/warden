@@ -3,8 +3,8 @@
 namespace Warden;
 
 use Illuminate\Support\ServiceProvider;
-use Warden\Commands\DeepwikiReindexCommand;
 use Warden\Commands\WardenInstallCommand;
+use Warden\Commands\WardenReindexCommand;
 use Warden\Commands\WardenStatusCommand;
 use Warden\Http\Middleware\ValidateWardenSharedKey;
 use Warden\Mcp\Servers\WardenServer;
@@ -88,7 +88,7 @@ class WardenServiceProvider extends ServiceProvider
             $this->commands([
                 WardenInstallCommand::class,
                 WardenStatusCommand::class,
-                DeepwikiReindexCommand::class,
+                WardenReindexCommand::class,
             ]);
         }
 

@@ -20,15 +20,15 @@
     "homepage": "https://github.com/ChrisThompsonTLDR/warden",
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^11.0|^12.0",
-        "illuminate/console": "^11.0|^12.0",
-        "illuminate/http": "^11.0|^12.0",
-        "illuminate/process": "^11.0|^12.0",
-        "laravel/mcp": "^0.1",
-        "echolabsdev/prism": "^0.29"
+        "illuminate/support": "^12.0",
+        "illuminate/console": "^12.0",
+        "illuminate/http": "^12.0",
+        "illuminate/process": "^12.0",
+        "laravel/mcp": "^0.3",
+        "prism-php/prism": "^0.98"
     },
     "require-dev": {
-        "orchestra/testbench": "^9.0|^10.0",
+        "orchestra/testbench": "^10.8",
         "phpunit/phpunit": "^10.0|^11.0"
     },
     "autoload": {

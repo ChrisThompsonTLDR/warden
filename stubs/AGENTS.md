@@ -295,16 +295,16 @@ php artisan warden:install --force        # Overwrite existing files
 php artisan warden:install --skip-docker  # Skip Docker setup
 ```
 
-### `php artisan deepwiki:reindex`
+### `php artisan warden:reindex`
 
 Create worktree, staging DB, and trigger Deepwiki reindex:
 
 ```bash
-php artisan deepwiki:reindex              # Current branch
-php artisan deepwiki:reindex main         # Specific branch
-php artisan deepwiki:reindex --force      # Force reindex
-php artisan deepwiki:reindex --skip-history
-php artisan deepwiki:reindex --skip-migrations
+php artisan warden:reindex              # Current branch
+php artisan warden:reindex main         # Specific branch
+php artisan warden:reindex --force      # Force reindex
+php artisan warden:reindex --skip-history
+php artisan warden:reindex --skip-migrations
 ```
 
 ### `php artisan warden:status`
@@ -361,7 +361,7 @@ Branch 'feature/2fa' has not been indexed
 
 **Solution:**
 ```bash
-php artisan deepwiki:reindex feature/2fa
+php artisan warden:reindex feature/2fa
 ```
 
 ### Authentication Failed
@@ -389,7 +389,7 @@ git worktree list
 git worktree prune
 
 # Retry
-php artisan deepwiki:reindex
+php artisan warden:reindex
 ```
 
 ## Best Practices

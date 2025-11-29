@@ -15,16 +15,16 @@ use function Laravel\Prompts\progress;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\warning;
 
-class DeepwikiReindexCommand extends Command
+class WardenReindexCommand extends Command
 {
-    protected $signature = 'deepwiki:reindex 
+    protected $signature = 'warden:reindex 
                             {branch? : The branch to reindex (defaults to current branch)}
                             {--skip-migrations : Skip running migrations}
                             {--skip-seeders : Skip running seeders}
                             {--skip-history : Skip indexing commit history}
                             {--force : Force reindex even if index exists}';
 
-    protected $description = 'Create worktree, staging DB, and trigger Deepwiki reindex for a branch';
+    protected $description = 'Create worktree, staging DB, and trigger reindex for a branch';
 
     public function __construct(
         protected BranchManager $branchManager,

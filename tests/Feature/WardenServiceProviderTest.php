@@ -37,6 +37,6 @@ class WardenServiceProviderTest extends TestCase
 
         $this->assertArrayHasKey('warden:install', $commands);
         $this->assertArrayHasKey('warden:status', $commands);
-        $this->assertArrayHasKey('deepwiki:reindex', $commands);
+        $this->assertArrayHasKey('warden:reindex', $commands);
     }
 }

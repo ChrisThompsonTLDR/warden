@@ -29,7 +29,7 @@ class DeepwikiAskTool
         if (! $this->worktreeManager->worktreeExists($branch)) {
             return [
                 'success' => false,
-                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan deepwiki:reindex {$branch}' first.",
+                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan warden:reindex {$branch}' first.",
             ];
         }
 

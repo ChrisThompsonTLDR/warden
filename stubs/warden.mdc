@@ -64,13 +64,13 @@ Always include it when making MCP requests:
 
 ```bash
 # Index current branch
-php artisan deepwiki:reindex
+php artisan warden:reindex
 
 # Index specific branch
-php artisan deepwiki:reindex main
+php artisan warden:reindex main
 
 # Force reindex
-php artisan deepwiki:reindex --force
+php artisan warden:reindex --force
 
 # Check status
 php artisan warden:status

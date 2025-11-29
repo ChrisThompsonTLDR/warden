@@ -11,7 +11,7 @@ use Warden\Services\WorktreeManager;
  * Ask questions about the codebase.
  *
  * This tool uses Deepwiki to answer questions about your code for a specific branch.
- * Ensure the branch has been indexed with: php artisan deepwiki:reindex {branch}
+ * Ensure the branch has been indexed with: php artisan warden:reindex {branch}
  *
  * @see AGENTS.md for full documentation
  */
@@ -37,7 +37,7 @@ class DeepwikiAskTool
         if (! $this->worktreeManager->worktreeExists($branch)) {
             return [
                 'success' => false,
-                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan deepwiki:reindex {$branch}' first.",
+                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan warden:reindex {$branch}' first.",
             ];
         }
 

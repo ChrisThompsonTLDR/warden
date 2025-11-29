@@ -80,7 +80,7 @@ Register the MCP server in `config/mcp.php`:
 2. **Index your codebase**
 
    ```bash
-   php artisan deepwiki:reindex
+   php artisan warden:reindex
    ```
 
 3. **Connect your MCP client**
@@ -120,9 +120,9 @@ Warden provides these MCP tools for AI assistants:
 php artisan warden:install
 
 # Index a branch
-php artisan deepwiki:reindex          # Current branch
-php artisan deepwiki:reindex main     # Specific branch
-php artisan deepwiki:reindex --force  # Force reindex
+php artisan warden:reindex          # Current branch
+php artisan warden:reindex main     # Specific branch
+php artisan warden:reindex --force  # Force reindex
 
 # Check status
 php artisan warden:status

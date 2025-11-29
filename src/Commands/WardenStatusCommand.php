@@ -92,7 +92,7 @@ class WardenStatusCommand extends Command
         $branches = $this->branchManager->listBranches();
         if (empty($branches)) {
             note('No Warden branches configured yet.');
-            note('Run: php artisan deepwiki:reindex');
+            note('Run: php artisan warden:reindex');
 
             return;
         }

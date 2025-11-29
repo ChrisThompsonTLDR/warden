@@ -247,7 +247,7 @@ GITIGNORE;
         note('   ],');
         note('');
         note('3. Start Deepwiki and create your first index:');
-        note('   php artisan deepwiki:reindex');
+        note('   php artisan warden:reindex');
         note('');
         note('4. Connect your MCP client (ChatGPT, Cursor, etc.) to:');
         note('   '.url(config('warden.mcp.path', '/mcp/warden')));
