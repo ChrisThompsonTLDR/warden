@@ -1,0 +1,62 @@
+{
+    "name": "christhompsontldr/warden",
+    "description": "Laravel package integrating Deepwiki-Open with MCP for AI-powered codebase analysis",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "deepwiki",
+        "mcp",
+        "ai",
+        "codebase-analysis",
+        "rag"
+    ],
+    "authors": [
+        {
+            "name": "Chris Thompson",
+            "email": "chris@christhompsontldr.com"
+        }
+    ],
+    "homepage": "https://github.com/ChrisThompsonTLDR/warden",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/console": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0",
+        "illuminate/process": "^11.0|^12.0",
+        "laravel/mcp": "^0.1",
+        "echolabsdev/prism": "^0.29"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Warden\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Warden\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Warden\\WardenServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}

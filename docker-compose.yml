@@ -1,0 +1,39 @@
+# Warden Development Docker Compose
+#
+# This file is for developing the Warden package itself.
+# For using Warden in your Laravel application, see stubs/docker-compose.warden.yml
+#
+# Usage:
+#   docker compose up -d
+
+services:
+  deepwiki:
+    image: ghcr.io/asyncfuncai/deepwiki-open:latest
+    container_name: warden-deepwiki
+    restart: unless-stopped
+    ports:
+      # Bind to localhost only for security
+      - "127.0.0.1:8001:8001"
+    environment:
+      # OpenAI API key from host environment
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Embeddings configuration
+      - EMBEDDING_MODEL=${WARDEN_EMBEDDINGS_MODEL:-text-embedding-3-small}
+      # Server configuration
+      - HOST=0.0.0.0
+      - PORT=8001
+    volumes:
+      # Mount .warden directory for persistent storage
+      - ./.warden:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - warden
+
+networks:
+  warden:
+    driver: bridge

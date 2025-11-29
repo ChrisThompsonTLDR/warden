@@ -1,0 +1,99 @@
+<?php
+
+namespace Warden\Mcp\Tools;
+
+use Illuminate\Support\Facades\Artisan;
+use Laravel\Mcp\Attributes\McpTool;
+use Warden\Services\BranchManager;
+use Warden\Services\DeepwikiClient;
+use Warden\Services\WorktreeManager;
+
+#[McpTool(
+    name: 'deepwiki.reindex_project',
+    description: 'Trigger a full reindex of the codebase for a specific repository and branch'
+)]
+class DeepwikiReindexTool
+{
+    public function __construct(
+        protected BranchManager $branchManager,
+        protected WorktreeManager $worktreeManager,
+        protected DeepwikiClient $deepwikiClient
+    ) {}
+
+    public function __invoke(
+        string $repo,
+        string $branch,
+        bool $force = false,
+        bool $skipHistory = false
+    ): array {
+        $projectId = $this->branchManager->getProjectId($branch);
+
+        try {
+            // Run the reindex command
+            $exitCode = Artisan::call('deepwiki:reindex', [
+                'branch' => $branch,
+                '--force' => $force,
+                '--skip-history' => $skipHistory,
+            ]);
+
+            $output = Artisan::output();
+
+            if ($exitCode !== 0) {
+                return [
+                    'success' => false,
+                    'error' => 'Reindex command failed',
+                    'output' => $output,
+                ];
+            }
+
+            // Get paths for response
+            $worktreePath = $this->branchManager->getWorktreePath($branch);
+            $indexPath = $this->branchManager->getIndexPath($branch);
+            $historyPath = $this->branchManager->getHistoryPath($branch);
+
+            return [
+                'success' => true,
+                'repo' => $repo,
+                'branch' => $branch,
+                'project_id' => $projectId,
+                'worktree_path' => $worktreePath,
+                'index_path' => $indexPath,
+                'history_path' => $historyPath,
+                'message' => "Successfully reindexed {$repo}/{$branch}",
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    public static function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'repo' => [
+                    'type' => 'string',
+                    'description' => 'The logical repository name',
+                ],
+                'branch' => [
+                    'type' => 'string',
+                    'description' => 'The Git branch name to reindex (e.g., main, develop, feature/2fa)',
+                ],
+                'force' => [
+                    'type' => 'boolean',
+                    'description' => 'Force reindex even if index exists',
+                    'default' => false,
+                ],
+                'skipHistory' => [
+                    'type' => 'boolean',
+                    'description' => 'Skip indexing commit history',
+                    'default' => false,
+                ],
+            ],
+            'required' => ['repo', 'branch'],
+        ];
+    }
+}
