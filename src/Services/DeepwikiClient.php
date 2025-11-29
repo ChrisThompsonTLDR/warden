@@ -16,6 +16,13 @@ class DeepwikiClient
         $this->http = Http::baseUrl($this->serverUrl)
             ->timeout(120)
             ->acceptJson();
+
+        // Add OpenAI API key header if provided (Deepwiki may use this for embeddings)
+        if ($this->openaiApiKey) {
+            $this->http = $this->http->withHeaders([
+                'X-OpenAI-API-Key' => $this->openaiApiKey,
+            ]);
+        }
     }
 
     /**
