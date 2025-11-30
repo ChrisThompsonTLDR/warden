@@ -12,7 +12,7 @@ class AstExtractorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->extractor = new AstExtractor();
+        $this->extractor = new AstExtractor;
     }
 
     public function test_parse_valid_php_code(): void

@@ -4,7 +4,6 @@ namespace Warden\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Process;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\info;
@@ -91,15 +90,8 @@ class WardenInstallCommand extends Command
 
         $wardenRoot = config('warden.warden_root', base_path('.warden'));
 
-        $directories = [
-            $wardenRoot,
-            $wardenRoot.'/worktrees',
-        ];
-
-        foreach ($directories as $dir) {
-            if (! File::isDirectory($dir)) {
-                File::makeDirectory($dir, 0755, true);
-            }
+        if (! File::isDirectory($wardenRoot)) {
+            File::makeDirectory($wardenRoot, 0755, true);
         }
 
         // Create .gitignore in .warden
@@ -107,13 +99,9 @@ class WardenInstallCommand extends Command
 # Warden directory structure
 # ===========================
 # This directory contains:
-# - worktrees/<branch>/ - Git worktree checkouts per branch
 # - <branch>/database/staging.sqlite - Branch-specific staging databases
 # - <branch>/index/ - FAISS vector indexes per branch
 # - <branch>/history/ - Git commit history for RAG
-
-# Ignore all worktrees (they're ephemeral)
-worktrees/
 
 # Ignore staging databases (can be regenerated)
 */database/
@@ -173,17 +161,36 @@ GITIGNORE;
             return;
         }
 
-        // Publish docker-compose.warden.yml
+        // Sail uses compose.yaml (generated from compose.stub)
+        $composePath = base_path('compose.yaml');
+        if (! File::exists($composePath)) {
+            warning('compose.yaml not found. Sail may not be installed yet.');
+
+            if (confirm('Would you like to publish Sail\'s compose.yaml first?', true)) {
+                try {
+                    $this->call('sail:publish');
+                } catch (\Exception $e) {
+                    warning('Failed to publish Sail compose.yaml: '.$e->getMessage());
+                    note('Please run "php artisan sail:publish" manually, then run "php artisan warden:install" again.');
+
+                    return;
+                }
+            } else {
+                note('Please run "php artisan sail:publish" first, then run "php artisan warden:install" again.');
+                note('Alternatively, you can manually add Deepwiki to your compose.yaml.');
+
+                return;
+            }
+        }
+
+        // Publish docker-compose.warden.yml as reference
         $this->call('vendor:publish', [
             '--tag' => 'warden-docker',
             '--force' => $this->option('force'),
         ]);
 
-        // Check if docker-compose.yml exists
-        $dockerComposePath = base_path('docker-compose.yml');
-        if (File::exists($dockerComposePath)) {
-            $this->mergeDockerCompose($dockerComposePath);
-        }
+        // Merge Deepwiki service into Sail's compose.yaml
+        $this->mergeDockerCompose($composePath);
 
         info('✓ Docker Compose configuration updated');
 
@@ -194,19 +201,164 @@ GITIGNORE;
     protected function mergeDockerCompose(string $path): void
     {
         $existingConfig = File::get($path);
+        $filename = basename($path);
 
         // Check if deepwiki service already exists
         if (str_contains($existingConfig, 'deepwiki:')) {
-            warning('Deepwiki service already exists in docker-compose.yml');
+            warning("Deepwiki service already exists in {$filename}");
 
             return;
         }
 
-        // Add reference to the warden compose file
-        if (! str_contains($existingConfig, 'docker-compose.warden.yml')) {
-            note('Add the following to your docker-compose.yml or use docker compose -f:');
-            note('  docker compose -f docker-compose.yml -f docker-compose.warden.yml up');
+        // Try to use Symfony YAML if available
+        if (class_exists(\Symfony\Component\Yaml\Yaml::class)) {
+            $this->mergeDockerComposeWithYaml($path, $existingConfig);
+
+            return;
         }
+
+        // Fallback to string-based insertion
+        $this->mergeDockerComposeWithString($path, $existingConfig);
+    }
+
+    protected function mergeDockerComposeWithYaml(string $path, string $existingConfig): void
+    {
+        try {
+            $yaml = \Symfony\Component\Yaml\Yaml::parse($existingConfig);
+
+            // Add deepwiki service
+            if (! isset($yaml['services'])) {
+                $yaml['services'] = [];
+            }
+
+            // Determine which network to use - check if Sail network exists
+            $hasSailNetwork = isset($yaml['networks']['sail']);
+            $network = $hasSailNetwork ? 'sail' : 'warden';
+
+            $yaml['services']['deepwiki'] = [
+                'image' => 'ghcr.io/asyncfuncai/deepwiki-open:latest',
+                'container_name' => 'deepwiki',
+                'restart' => 'unless-stopped',
+                'ports' => [
+                    '127.0.0.1:8001:8001',
+                ],
+                'environment' => [
+                    'OPENAI_API_KEY=${OPENAI_API_KEY}',
+                    'EMBEDDING_MODEL=${WARDEN_EMBEDDINGS_MODEL:-text-embedding-3-small}',
+                    'HOST=0.0.0.0',
+                    'PORT=8001',
+                ],
+                'volumes' => [
+                    './.warden:/app/data',
+                ],
+                'healthcheck' => [
+                    'test' => ['CMD', 'curl', '-f', 'http://localhost:8001/health'],
+                    'interval' => '30s',
+                    'timeout' => '10s',
+                    'retries' => 3,
+                    'start_period' => '10s',
+                ],
+                'networks' => [$network],
+            ];
+
+            // Add warden network only if not using Sail's network
+            if (! $hasSailNetwork) {
+                if (! isset($yaml['networks'])) {
+                    $yaml['networks'] = [];
+                }
+                if (! isset($yaml['networks']['warden'])) {
+                    $yaml['networks']['warden'] = [
+                        'driver' => 'bridge',
+                    ];
+                }
+            }
+
+            // Write back the merged YAML
+            $mergedYaml = \Symfony\Component\Yaml\Yaml::dump($yaml, 4, 2, \Symfony\Component\Yaml\Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            File::put($path, $mergedYaml);
+
+            info('✓ Added Deepwiki service to compose.yaml');
+        } catch (\Exception $e) {
+            warning('Failed to merge with YAML parser: '.$e->getMessage());
+            $this->mergeDockerComposeWithString($path, $existingConfig);
+        }
+    }
+
+    protected function mergeDockerComposeWithString(string $path, string $existingConfig): void
+    {
+        // Check if Sail network exists - if so, use it; otherwise create warden network
+        $hasSailNetwork = preg_match('/^\s+sail:\s*$/m', $existingConfig);
+        $network = $hasSailNetwork ? 'sail' : 'warden';
+
+        $deepwikiService = $this->getDeepwikiServiceYaml($network);
+
+        // Find the services section
+        if (! preg_match('/^services:\s*$/m', $existingConfig)) {
+            // No services section, add it
+            $existingConfig .= "\nservices:\n".$deepwikiService;
+        } else {
+            // Find where to insert - look for end of services section (networks, volumes, or end of file)
+            $insertPos = null;
+
+            // Try to find networks section first (common in Sail)
+            if (preg_match('/^networks:\s*$/m', $existingConfig, $matches, PREG_OFFSET_CAPTURE)) {
+                $insertPos = $matches[0][1];
+            } elseif (preg_match('/^volumes:\s*$/m', $existingConfig, $matches, PREG_OFFSET_CAPTURE)) {
+                $insertPos = $matches[0][1];
+            }
+
+            if ($insertPos !== null) {
+                // Insert before networks/volumes section
+                $existingConfig = substr_replace($existingConfig, "\n".$deepwikiService."\n", $insertPos, 0);
+            } else {
+                // No networks/volumes section, append at end
+                $existingConfig = rtrim($existingConfig)."\n\n".$deepwikiService;
+            }
+        }
+
+        // Add networks section if needed (only if not using Sail's network)
+        if (! $hasSailNetwork) {
+            if (! preg_match('/^networks:\s*$/m', $existingConfig)) {
+                $existingConfig .= "\n\nnetworks:\n  warden:\n    driver: bridge\n";
+            } elseif (! preg_match('/^\s+warden:/m', $existingConfig)) {
+                // Networks section exists but warden network doesn't
+                if (preg_match('/^networks:\s*$/m', $existingConfig, $matches, PREG_OFFSET_CAPTURE)) {
+                    $insertPos = $matches[0][1] + strlen($matches[0][0]);
+                    $existingConfig = substr_replace($existingConfig, "\n  warden:\n    driver: bridge", $insertPos, 0);
+                }
+            }
+        }
+
+        File::put($path, $existingConfig);
+        $filename = basename($path);
+        info("✓ Added Deepwiki service to {$filename}");
+    }
+
+    protected function getDeepwikiServiceYaml(string $network = 'warden'): string
+    {
+        return <<<YAML
+  deepwiki:
+    image: ghcr.io/asyncfuncai/deepwiki-open:latest
+    container_name: deepwiki
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      - OPENAI_API_KEY=\${OPENAI_API_KEY}
+      - EMBEDDING_MODEL=\${WARDEN_EMBEDDINGS_MODEL:-text-embedding-3-small}
+      - HOST=0.0.0.0
+      - PORT=8001
+    volumes:
+      - ./.warden:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - {$network}
+YAML;
     }
 
     protected function setupStandaloneDocker(): void
@@ -250,7 +402,13 @@ GITIGNORE;
         note('   php artisan warden:reindex');
         note('');
         note('4. Connect your MCP client (ChatGPT, Cursor, etc.) to:');
-        note('   '.url(config('warden.mcp.path', '/mcp/warden')));
+        $mcpPath = config('warden.mcp.path', '/mcp/warden');
+        $mcpUrl = url($mcpPath);
+        if (is_string($mcpUrl)) {
+            note('   '.$mcpUrl);
+        } else {
+            note('   '.$mcpPath.' (configure your base URL)');
+        }
         note('');
         note('For more information, see AGENTS.md');
     }

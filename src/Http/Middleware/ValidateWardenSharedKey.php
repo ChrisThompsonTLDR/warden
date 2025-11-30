@@ -43,7 +43,8 @@ class ValidateWardenSharedKey
             $providedKey = $request->bearerToken();
         }
 
-        if (empty($providedKey) || ! hash_equals($configuredKey, $providedKey)) {
+        // Ensure both are strings for hash_equals
+        if (! is_string($providedKey) || ! is_string($configuredKey) || ! hash_equals($configuredKey, $providedKey)) {
             return response()->json([
                 'error' => 'Invalid or missing Warden shared key',
                 'hint' => 'Provide the key via X-Warden-Key header, warden_key query parameter, or Bearer token',

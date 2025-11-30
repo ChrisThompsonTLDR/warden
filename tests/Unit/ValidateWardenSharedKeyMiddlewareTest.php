@@ -13,7 +13,7 @@ class ValidateWardenSharedKeyMiddlewareTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->middleware = new ValidateWardenSharedKey();
+        $this->middleware = new ValidateWardenSharedKey;
     }
 
     public function test_allows_request_with_valid_header_key(): void

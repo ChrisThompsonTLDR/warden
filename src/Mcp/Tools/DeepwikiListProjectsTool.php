@@ -2,27 +2,23 @@
 
 namespace Warden\Mcp\Tools;
 
-use Laravel\Mcp\Attributes\McpTool;
 use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
 use Warden\Services\GitHistoryService;
 use Warden\Services\StagingDatabaseManager;
-use Warden\Services\WorktreeManager;
 
-#[McpTool(
-    name: 'deepwiki.list_projects',
-    description: 'List all Deepwiki projects including branch-derived IDs and their status'
-)]
 class DeepwikiListProjectsTool
 {
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected StagingDatabaseManager $stagingDbManager,
         protected GitHistoryService $gitHistoryService,
         protected DeepwikiClient $deepwikiClient
     ) {}
 
+    /**
+     * @return array{success: bool, error?: string, repo?: string, deepwiki_available?: bool, projects?: array<int, array<string, mixed>>, total?: int}
+     */
     public function __invoke(?string $repo = null): array
     {
         try {
@@ -50,10 +46,7 @@ class DeepwikiListProjectsTool
                     'repo' => $repoName,
                     'branch' => $branch,
                     'project_id' => $projectId,
-                    'worktree' => [
-                        'exists' => $this->worktreeManager->worktreeExists($branch),
-                        'path' => $this->branchManager->getWorktreePath($branch),
-                    ],
+                    'indexed' => $this->branchManager->isBranchIndexed($branch),
                     'database' => [
                         'exists' => $this->stagingDbManager->databaseExists($branch),
                         'path' => $this->branchManager->getStagingDatabasePath($branch),
@@ -91,6 +84,9 @@ class DeepwikiListProjectsTool
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function inputSchema(): array
     {
         return [

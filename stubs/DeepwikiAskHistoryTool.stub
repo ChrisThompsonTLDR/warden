@@ -5,8 +5,6 @@ namespace App\Mcp\Tools;
 use Laravel\Mcp\Attributes\McpTool;
 use Warden\Services\BranchManager;
 use Warden\Services\GitHistoryService;
-use Warden\Services\WorktreeManager;
-
 /**
  * Ask questions about Git commit history.
  *
@@ -23,7 +21,6 @@ class DeepwikiAskHistoryTool
 {
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected GitHistoryService $gitHistoryService
     ) {}
 
@@ -36,11 +33,11 @@ class DeepwikiAskHistoryTool
         ?string $until = null,
         ?string $path = null
     ): array {
-        // Validate the branch exists
-        if (! $this->worktreeManager->worktreeExists($branch)) {
+        // Validate the branch has been indexed
+        if (! $this->branchManager->isBranchIndexed($branch)) {
             return [
                 'success' => false,
-                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan warden:reindex {$branch}' first.",
+                'error' => "Branch '{$branch}' has not been indexed. Switch to that branch and run 'php artisan warden:reindex' first.",
             ];
         }
 

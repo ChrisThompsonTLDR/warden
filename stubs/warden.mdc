@@ -19,7 +19,6 @@ Warden integrates Deepwiki-Open with Laravel's MCP to provide AI-powered codebas
 
 ```
 .warden/
-├── worktrees/<branch>/     # Git worktree checkouts per branch
 ├── <branch>/database/      # Branch-specific staging SQLite databases
 ├── <branch>/index/         # FAISS vector indexes per branch
 └── <branch>/history/       # Git commit history for RAG
@@ -36,9 +35,10 @@ When using this codebase, you have access to these MCP tools:
 
 ## Branch-Aware Development
 
-- Each branch has isolated: worktree, staging DB, index, history
+- Each branch has isolated: staging DB, index, history
 - Branch names are sanitized: `feature/2fa` → `feature-2fa`
 - Project IDs: `<repo>-<branch>` (e.g., `myapp-main`)
+- To index a branch, switch to it first: `git checkout <branch>` then run `php artisan warden:reindex`
 
 ## Staging Database Convention
 
@@ -63,11 +63,12 @@ Always include it when making MCP requests:
 ## Indexing Commands
 
 ```bash
-# Index current branch
+# Index current git branch (automatically detected)
 php artisan warden:reindex
 
-# Index specific branch
-php artisan warden:reindex main
+# To index a different branch, switch to it first
+git checkout main
+php artisan warden:reindex
 
 # Force reindex
 php artisan warden:reindex --force
@@ -91,7 +92,6 @@ Key config in `config/warden.php`:
 ### Services
 
 - `BranchManager` - Manages branch paths and project IDs
-- `WorktreeManager` - Creates/updates Git worktrees
 - `StagingDatabaseManager` - Manages branch-specific SQLite DBs
 - `DeepwikiClient` - HTTP client for Deepwiki API
 - `GitHistoryService` - Extracts and indexes commit history

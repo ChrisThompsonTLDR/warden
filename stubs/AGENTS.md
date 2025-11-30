@@ -18,10 +18,6 @@ This document describes the AI agents system in this project, including how Deep
 
 ```
 .warden/
-├── worktrees/
-│   ├── main/           # Git worktree checkout for main branch
-│   ├── develop/        # Git worktree checkout for develop branch
-│   └── feature-2fa/    # Git worktree checkout for feature/2fa branch
 ├── main/
 │   ├── database/
 │   │   └── staging.sqlite   # Branch-specific staging database
@@ -297,15 +293,16 @@ php artisan warden:install --skip-docker  # Skip Docker setup
 
 ### `php artisan warden:reindex`
 
-Create worktree, staging DB, and trigger Deepwiki reindex:
+Index current git branch: create staging DB, extract history, and trigger Deepwiki reindex:
 
 ```bash
-php artisan warden:reindex              # Current branch
-php artisan warden:reindex main         # Specific branch
+php artisan warden:reindex              # Index current branch
 php artisan warden:reindex --force      # Force reindex
 php artisan warden:reindex --skip-history
 php artisan warden:reindex --skip-migrations
 ```
+
+**Note:** The command automatically detects the current git branch. To index a different branch, switch to it first: `git checkout <branch>` then run `php artisan warden:reindex`
 
 ### `php artisan warden:status`
 
@@ -374,31 +371,29 @@ Invalid or missing Warden shared key
 1. Check `WARDEN_SHARED_KEY` in `.env`
 2. Ensure MCP client sends the key via `X-Warden-Key` header
 
-### Worktree Creation Failed
+### Branch Not Indexed
 
 ```
-Failed to create worktree: ...
+Branch 'feature/2fa' has not been indexed
 ```
 
 **Solution:**
 ```bash
-# Check existing worktrees
-git worktree list
+# Switch to the branch you want to index
+git checkout feature/2fa
 
-# Remove stale worktrees
-git worktree prune
-
-# Retry
+# Then run reindex
 php artisan warden:reindex
 ```
 
 ## Best Practices
 
 1. **Index frequently**: Reindex after significant changes
-2. **Use branch isolation**: Each branch has its own isolated environment
-3. **Commit small DBs**: For deterministic analysis, commit small staging DBs
-4. **Rotate keys**: Change `WARDEN_SHARED_KEY` periodically
-5. **Monitor logs**: Check Deepwiki logs for indexing issues
+2. **Use branch isolation**: Each branch has its own isolated environment (index, database, history)
+3. **Switch branches to index**: To index a different branch, switch to it first with `git checkout`
+4. **Commit small DBs**: For deterministic analysis, commit small staging DBs
+5. **Rotate keys**: Change `WARDEN_SHARED_KEY` periodically
+6. **Monitor logs**: Check Deepwiki logs for indexing issues
 
 ## Support
 

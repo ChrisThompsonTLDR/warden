@@ -13,7 +13,7 @@ class AstExtractor
 
     public function __construct()
     {
-        $this->parser = (new ParserFactory())->createForNewestSupportedVersion();
+        $this->parser = (new ParserFactory)->createForNewestSupportedVersion();
     }
 
     /**
@@ -34,17 +34,7 @@ class AstExtractor
      * Extract symbol metadata from an AST.
      *
      * @param  Node[]  $ast
-     * @return array<array{
-     *     type: string,
-     *     name: string,
-     *     file: string,
-     *     fqcn: string|null,
-     *     class: string|null,
-     *     function: string|null,
-     *     start_line: int,
-     *     end_line: int,
-     *     docblock: string|null
-     * }>
+     * @return array<int, array{type: string, name: string, file: string, fqcn: string|null, class: string|null, function: string|null, start_line: int, end_line: int, docblock: string|null}>
      */
     public function extractSymbols(array $ast, string $relPath): array
     {
@@ -52,8 +42,10 @@ class AstExtractor
         $currentNamespace = '';
         $currentClass = null;
 
-        $traverser = new NodeTraverser();
-        $visitor = new class($symbols, $relPath, $currentNamespace, $currentClass) extends NodeVisitorAbstract {
+        $traverser = new NodeTraverser;
+        $visitor = new class($symbols, $relPath, $currentNamespace, $currentClass) extends NodeVisitorAbstract
+        {
+            /** @var array<int, array<string, mixed>> */
             public array $symbols = [];
 
             public string $relPath;
@@ -62,6 +54,9 @@ class AstExtractor
 
             public ?string $currentClass = null;
 
+            /**
+             * @param  array<int, array<string, mixed>>  $symbols
+             */
             public function __construct(
                 array &$symbols,
                 string $relPath,
@@ -89,13 +84,17 @@ class AstExtractor
                     $this->currentClass = $name;
                     $fqcn = $this->currentNamespace ? $this->currentNamespace.'\\'.$name : $name;
 
-                    $type = match (true) {
-                        $node instanceof Node\Stmt\Class_ => 'class',
-                        $node instanceof Node\Stmt\Interface_ => 'interface',
-                        $node instanceof Node\Stmt\Trait_ => 'trait',
-                        $node instanceof Node\Stmt\Enum_ => 'enum',
-                        default => 'class',
-                    };
+                    // Determine type based on node type
+                    if ($node instanceof Node\Stmt\Class_) {
+                        $type = 'class';
+                    } elseif ($node instanceof Node\Stmt\Interface_) {
+                        $type = 'interface';
+                    } elseif ($node instanceof Node\Stmt\Trait_) {
+                        $type = 'trait';
+                    } else {
+                        // Must be Enum_ based on the if condition above
+                        $type = 'enum';
+                    }
 
                     $this->symbols[] = [
                         'type' => $type,
@@ -243,7 +242,10 @@ class AstExtractor
         $traverser->addVisitor($visitor);
         $traverser->traverse($ast);
 
-        return $visitor->symbols;
+        /** @var array<int, array{type: string, name: string, file: string, fqcn: string|null, class: string|null, function: string|null, start_line: int, end_line: int, docblock: string|null}> $symbols */
+        $symbols = $visitor->symbols;
+
+        return $symbols;
     }
 
     /**
@@ -268,6 +270,8 @@ class AstExtractor
 
     /**
      * Build embedding input text from symbol and snippet.
+     *
+     * @param  array<string, mixed>  $symbol
      */
     public function buildEmbeddingInput(array $symbol, string $snippet): string
     {
@@ -294,6 +298,8 @@ class AstExtractor
 
     /**
      * Build a stable ID for a symbol.
+     *
+     * @param  array<string, mixed>  $payload
      */
     public function buildSymbolId(string $branch, array $payload): string
     {
@@ -309,6 +315,8 @@ class AstExtractor
 
     /**
      * Build a symbol key for the index map.
+     *
+     * @param  array<string, mixed>  $payload
      */
     public function buildSymbolKey(array $payload): ?string
     {

@@ -6,8 +6,10 @@ class VectorStore
 {
     protected string $indexPath;
 
+    /** @var array<string, array<int, float>> */
     protected array $vectors = [];
 
+    /** @var array<string, array<string, mixed>> */
     protected array $payloads = [];
 
     public function __construct(string $indexPath)
@@ -20,7 +22,8 @@ class VectorStore
     /**
      * Upsert a vector with its payload.
      *
-     * @param  array<float>  $vector
+     * @param  array<int, float>  $vector
+     * @param  array<string, mixed>  $payload
      */
     public function upsert(string $id, array $vector, array $payload): void
     {
@@ -39,8 +42,9 @@ class VectorStore
     /**
      * Search for similar vectors using cosine similarity.
      *
-     * @param  array<float>  $queryVector
-     * @return array<array{id: string, score: float, payload: array}>
+     * @param  array<int, float>  $queryVector
+     * @param  array<string, mixed>  $filter
+     * @return array<int, array{id: string, score: float, payload: array<string, mixed>}>
      */
     public function search(array $queryVector, int $topK = 10, array $filter = []): array
     {
@@ -70,6 +74,8 @@ class VectorStore
 
     /**
      * Get a payload by ID.
+     *
+     * @return array<string, mixed>|null
      */
     public function get(string $id): ?array
     {
@@ -118,9 +124,14 @@ class VectorStore
         $filePath = $this->getDataFilePath();
 
         if (file_exists($filePath)) {
-            $data = json_decode(file_get_contents($filePath), true);
-            $this->vectors = $data['vectors'] ?? [];
-            $this->payloads = $data['payloads'] ?? [];
+            $content = file_get_contents($filePath);
+            if ($content !== false) {
+                $data = json_decode($content, true);
+                if (is_array($data)) {
+                    $this->vectors = $data['vectors'] ?? [];
+                    $this->payloads = $data['payloads'] ?? [];
+                }
+            }
         }
     }
 
@@ -168,6 +179,9 @@ class VectorStore
 
     /**
      * Check if a payload matches the given filter.
+     *
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $filter
      */
     protected function matchesFilter(array $payload, array $filter): bool
     {

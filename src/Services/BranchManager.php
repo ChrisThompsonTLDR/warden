@@ -53,13 +53,11 @@ class BranchManager
     }
 
     /**
-     * Get the worktree path for a branch.
+     * Get the repository root path (current working directory).
      */
-    public function getWorktreePath(string $branch): string
+    public function getRepoPath(): string
     {
-        $sanitizedBranch = $this->sanitizeBranchName($branch);
-
-        return $this->wardenRoot.'/worktrees/'.$sanitizedBranch;
+        return base_path();
     }
 
     /**
@@ -101,11 +99,23 @@ class BranchManager
     }
 
     /**
+     * Get the worktree path for a branch.
+     */
+    public function getWorktreePath(string $branch): string
+    {
+        $sanitizedBranch = $this->sanitizeBranchName($branch);
+
+        return $this->wardenRoot.'/worktrees/'.$sanitizedBranch;
+    }
+
+    /**
      * Sanitize a branch name for use in file paths.
      */
     public function sanitizeBranchName(string $branch): string
     {
-        return preg_replace('/[^a-zA-Z0-9_-]/', '-', $branch);
+        $result = preg_replace('/[^a-zA-Z0-9_-]/', '-', $branch);
+
+        return $result ?? $branch;
     }
 
     /**
@@ -119,17 +129,55 @@ class BranchManager
     }
 
     /**
-     * List all branches with Warden data.
+     * Check if a branch has been indexed (has index, database, or history).
+     */
+    public function isBranchIndexed(string $branch): bool
+    {
+        $sanitizedBranch = $this->sanitizeBranchName($branch);
+        $branchDir = $this->wardenRoot.'/'.$sanitizedBranch;
+
+        if (! is_dir($branchDir)) {
+            return false;
+        }
+
+        // Check if branch has any Warden data
+        $hasIndex = is_dir($branchDir.'/index');
+        $hasDatabase = file_exists($branchDir.'/database/staging.sqlite');
+        $hasHistory = file_exists($branchDir.'/history/commits.jsonl');
+
+        return $hasIndex || $hasDatabase || $hasHistory;
+    }
+
+    /**
+     * List all branches with Warden data (index, database, or history).
+     *
+     * @return array<string>
      */
     public function listBranches(): array
     {
         $branches = [];
-        $worktreesPath = $this->wardenRoot.'/worktrees';
 
-        if (is_dir($worktreesPath)) {
-            $dirs = array_filter(glob($worktreesPath.'/*'), 'is_dir');
-            foreach ($dirs as $dir) {
-                $branches[] = basename($dir);
+        if (! is_dir($this->wardenRoot)) {
+            return $branches;
+        }
+
+        $globResult = glob($this->wardenRoot.'/*');
+        if ($globResult === false) {
+            return $branches;
+        }
+
+        $dirs = array_filter($globResult, 'is_dir');
+
+        foreach ($dirs as $dir) {
+            $branchName = basename($dir);
+
+            // Skip if it's not a branch directory (has index, database, or history)
+            $hasIndex = is_dir($dir.'/index');
+            $hasDatabase = is_dir($dir.'/database');
+            $hasHistory = is_dir($dir.'/history');
+
+            if ($hasIndex || $hasDatabase || $hasHistory) {
+                $branches[] = $branchName;
             }
         }
 

@@ -2,13 +2,13 @@
 
 namespace Warden\Mcp\Servers;
 
-use Laravel\Mcp\Server\McpServer;
+use Laravel\Mcp\Server;
 use Warden\Mcp\Tools\DeepwikiAskHistoryTool;
 use Warden\Mcp\Tools\DeepwikiAskTool;
 use Warden\Mcp\Tools\DeepwikiListProjectsTool;
 use Warden\Mcp\Tools\DeepwikiReindexTool;
 
-class WardenServer extends McpServer
+class WardenServer extends Server
 {
     /**
      * The server name.
@@ -27,6 +27,8 @@ class WardenServer extends McpServer
 
     /**
      * Get the tools provided by this server.
+     *
+     * @return array<int, class-string>
      */
     public function tools(): array
     {
@@ -40,6 +42,8 @@ class WardenServer extends McpServer
 
     /**
      * Get the server capabilities.
+     *
+     * @return array{tools: array{listChanged: bool}}
      */
     public function capabilities(): array
     {

@@ -7,28 +7,24 @@ use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
 use Warden\Services\GitHistoryService;
 use Warden\Services\StagingDatabaseManager;
-use Warden\Services\WorktreeManager;
 
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
-use function Laravel\Prompts\progress;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\warning;
 
 class WardenReindexCommand extends Command
 {
     protected $signature = 'warden:reindex 
-                            {branch? : The branch to reindex (defaults to current branch)}
                             {--skip-migrations : Skip running migrations}
                             {--skip-seeders : Skip running seeders}
                             {--skip-history : Skip indexing commit history}
                             {--force : Force reindex even if index exists}';
 
-    protected $description = 'Create worktree, staging DB, and trigger reindex for a branch';
+    protected $description = 'Index current git branch: create staging DB, extract history, and trigger Deepwiki reindex';
 
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected StagingDatabaseManager $stagingDbManager,
         protected GitHistoryService $gitHistoryService,
         protected DeepwikiClient $deepwikiClient
@@ -38,53 +34,27 @@ class WardenReindexCommand extends Command
 
     public function handle(): int
     {
-        // Determine branch
-        $branch = $this->argument('branch') ?? $this->branchManager->getCurrentBranch();
-
+        // Get current branch from git
+        $branch = $this->branchManager->getCurrentBranch();
         info("🔄 Reindexing branch: {$branch}");
 
-        // Step 1: Ensure worktree exists
-        $worktreePath = $this->setupWorktree($branch);
-        if (! $worktreePath) {
-            return self::FAILURE;
-        }
-
-        // Step 2: Setup staging database
+        // Step 1: Setup staging database
         if (! $this->option('skip-migrations')) {
             $this->setupStagingDatabase($branch);
         }
 
-        // Step 3: Extract commit history
+        // Step 2: Extract commit history
         if (! $this->option('skip-history')) {
             $this->extractCommitHistory($branch);
         }
 
-        // Step 4: Trigger Deepwiki reindex
-        $this->triggerDeepwikiReindex($branch, $worktreePath);
+        // Step 3: Trigger Deepwiki reindex
+        $repoPath = $this->branchManager->getRepoPath();
+        $this->triggerDeepwikiReindex($branch, $repoPath);
 
         $this->displaySummary($branch);
 
         return self::SUCCESS;
-    }
-
-    protected function setupWorktree(string $branch): ?string
-    {
-        note('Setting up Git worktree...');
-
-        try {
-            $worktreePath = spin(
-                fn () => $this->worktreeManager->ensureWorktree($branch),
-                'Creating/updating worktree...'
-            );
-
-            info("✓ Worktree ready at: {$worktreePath}");
-
-            return $worktreePath;
-        } catch (\Exception $e) {
-            $this->error('Failed to setup worktree: '.$e->getMessage());
-
-            return null;
-        }
     }
 
     protected function setupStagingDatabase(string $branch): void
@@ -146,14 +116,14 @@ class WardenReindexCommand extends Command
         }
     }
 
-    protected function triggerDeepwikiReindex(string $branch, string $worktreePath): void
+    protected function triggerDeepwikiReindex(string $branch, string $repoPath): void
     {
         note('Triggering Deepwiki reindex...');
 
         // Check if Deepwiki is available
         if (! $this->deepwikiClient->health()) {
             warning('Deepwiki server is not available at '.config('warden.deepwiki_server_url'));
-            warning('Please start Deepwiki and run this command again, or manually index the worktree.');
+            warning('Please start Deepwiki and run this command again.');
 
             return;
         }
@@ -162,7 +132,7 @@ class WardenReindexCommand extends Command
 
         try {
             $result = spin(
-                fn () => $this->deepwikiClient->reindex($projectId, $worktreePath, [
+                fn () => $this->deepwikiClient->reindex($projectId, $repoPath, [
                     'include' => config('warden.indexing.include', []),
                     'exclude' => config('warden.indexing.exclude', []),
                     'force' => $this->option('force'),
@@ -183,7 +153,7 @@ class WardenReindexCommand extends Command
     protected function displaySummary(string $branch): void
     {
         $projectId = $this->branchManager->getProjectId($branch);
-        $worktreePath = $this->branchManager->getWorktreePath($branch);
+        $repoPath = $this->branchManager->getRepoPath();
         $dbPath = $this->branchManager->getStagingDatabasePath($branch);
         $indexPath = $this->branchManager->getIndexPath($branch);
         $historyPath = $this->branchManager->getHistoryPath($branch);
@@ -193,7 +163,7 @@ class WardenReindexCommand extends Command
         info('==================');
         note("Branch:          {$branch}");
         note("Project ID:      {$projectId}");
-        note("Worktree:        {$worktreePath}");
+        note("Repository:      {$repoPath}");
         note("Staging DB:      {$dbPath}");
         note("Index Path:      {$indexPath}");
         note("History Path:    {$historyPath}");

@@ -3,11 +3,11 @@
 namespace Warden\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
 use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
 use Warden\Services\GitHistoryService;
 use Warden\Services\StagingDatabaseManager;
-use Warden\Services\WorktreeManager;
 
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
@@ -22,7 +22,6 @@ class WardenStatusCommand extends Command
 
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected StagingDatabaseManager $stagingDbManager,
         protected GitHistoryService $gitHistoryService,
         protected DeepwikiClient $deepwikiClient
@@ -38,7 +37,6 @@ class WardenStatusCommand extends Command
         $this->displayConfiguration();
         $this->displayDeepwikiStatus();
         $this->displayBranches();
-        $this->displayWorktrees();
         $this->displayDatabases();
 
         return self::SUCCESS;
@@ -80,7 +78,14 @@ class WardenStatusCommand extends Command
             }
         } else {
             warning('✗ Deepwiki server is not available');
-            note('  Start with: docker compose -f docker-compose.warden.yml up -d');
+
+            // Detect if Sail is being used
+            $hasSail = $this->detectSail();
+            if ($hasSail && File::exists(base_path('compose.yaml'))) {
+                note('  Start with: sail up -d deepwiki');
+            } else {
+                note('  Start with: docker compose -f docker-compose.warden.yml up -d');
+            }
         }
     }
 
@@ -103,39 +108,16 @@ class WardenStatusCommand extends Command
         $branchData = [];
         foreach ($branches as $branch) {
             $projectId = $this->branchManager->getProjectId($branch);
-            $hasWorktree = $this->worktreeManager->worktreeExists($branch) ? '✓' : '✗';
             $hasDb = $this->stagingDbManager->databaseExists($branch) ? '✓' : '✗';
             $historyPath = $this->branchManager->getHistoryPath($branch);
             $hasHistory = file_exists($historyPath.'/commits.jsonl') ? '✓' : '✗';
+            $indexPath = $this->branchManager->getIndexPath($branch);
+            $hasIndex = is_dir($indexPath) ? '✓' : '✗';
 
-            $branchData[] = [$branch, $projectId, $hasWorktree, $hasDb, $hasHistory];
+            $branchData[] = [$branch, $projectId, $hasIndex, $hasDb, $hasHistory];
         }
 
-        table(['Branch', 'Project ID', 'Worktree', 'Database', 'History'], $branchData);
-    }
-
-    protected function displayWorktrees(): void
-    {
-        note('');
-        note('Git Worktrees:');
-
-        $worktrees = $this->worktreeManager->listWorktrees();
-        if (empty($worktrees)) {
-            note('No worktrees found.');
-
-            return;
-        }
-
-        $worktreeData = [];
-        foreach ($worktrees as $worktree) {
-            $worktreeData[] = [
-                $worktree['branch'] ?? 'N/A',
-                $worktree['path'] ?? 'N/A',
-                substr($worktree['head'] ?? '', 0, 8),
-            ];
-        }
-
-        table(['Branch', 'Path', 'HEAD'], $worktreeData);
+        table(['Branch', 'Project ID', 'Index', 'Database', 'History'], $branchData);
     }
 
     protected function displayDatabases(): void
@@ -173,5 +155,22 @@ class WardenStatusCommand extends Command
         }
 
         return round($bytes, 2).' '.$units[$i];
+    }
+
+    protected function detectSail(): bool
+    {
+        // Check for Laravel Sail in composer.json
+        $composerJson = base_path('composer.json');
+        if (File::exists($composerJson)) {
+            $composer = json_decode(File::get($composerJson), true);
+
+            if (isset($composer['require']['laravel/sail']) ||
+                isset($composer['require-dev']['laravel/sail'])) {
+                return true;
+            }
+        }
+
+        // Check for sail binary
+        return File::exists(base_path('vendor/bin/sail'));
     }
 }

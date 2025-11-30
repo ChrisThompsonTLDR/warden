@@ -90,6 +90,8 @@ class StagingDatabaseManager
 
     /**
      * Get database connection config for a branch.
+     *
+     * @return array{driver: string, database: string, prefix: string, foreign_key_constraints: bool}
      */
     public function getConnectionConfig(string $branch): array
     {
@@ -124,11 +126,15 @@ class StagingDatabaseManager
             return 0;
         }
 
-        return filesize($databasePath);
+        $size = filesize($databasePath);
+
+        return $size !== false ? $size : 0;
     }
 
     /**
      * List all branches with staging databases.
+     *
+     * @return array<int, array{branch: string, database_path: string, size: int}>
      */
     public function listBranchesWithDatabases(): array
     {
@@ -139,7 +145,12 @@ class StagingDatabaseManager
             return $branches;
         }
 
-        $dirs = array_filter(glob($wardenRoot.'/*'), 'is_dir');
+        $globResult = glob($wardenRoot.'/*');
+        if ($globResult === false) {
+            return $branches;
+        }
+
+        $dirs = array_filter($globResult, 'is_dir');
 
         foreach ($dirs as $dir) {
             $branchName = basename($dir);
@@ -149,10 +160,11 @@ class StagingDatabaseManager
 
             $dbPath = $dir.'/database/staging.sqlite';
             if (file_exists($dbPath)) {
+                $size = filesize($dbPath);
                 $branches[] = [
                     'branch' => $branchName,
                     'database_path' => $dbPath,
-                    'size' => filesize($dbPath),
+                    'size' => $size !== false ? $size : 0,
                 ];
             }
         }

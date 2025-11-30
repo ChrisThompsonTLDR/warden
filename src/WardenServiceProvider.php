@@ -8,14 +8,12 @@ use Warden\Commands\WardenInstallCommand;
 use Warden\Commands\WardenReindexCommand;
 use Warden\Commands\WardenStatusCommand;
 use Warden\Http\Middleware\ValidateWardenSharedKey;
-use Warden\Mcp\Servers\WardenServer;
 use Warden\Services\AstExtractor;
 use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
 use Warden\Services\EmbeddingClient;
 use Warden\Services\GitHistoryService;
 use Warden\Services\StagingDatabaseManager;
-use Warden\Services\VectorStore;
 use Warden\Services\WorktreeManager;
 
 class WardenServiceProvider extends ServiceProvider
@@ -34,14 +32,14 @@ class WardenServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->singleton(WorktreeManager::class, function ($app) {
-            return new WorktreeManager(
+        $this->app->singleton(StagingDatabaseManager::class, function ($app) {
+            return new StagingDatabaseManager(
                 $app->make(BranchManager::class)
             );
         });
 
-        $this->app->singleton(StagingDatabaseManager::class, function ($app) {
-            return new StagingDatabaseManager(
+        $this->app->singleton(WorktreeManager::class, function ($app) {
+            return new WorktreeManager(
                 $app->make(BranchManager::class)
             );
         });
@@ -56,13 +54,12 @@ class WardenServiceProvider extends ServiceProvider
         $this->app->singleton(GitHistoryService::class, function ($app) {
             return new GitHistoryService(
                 $app->make(BranchManager::class),
-                $app->make(WorktreeManager::class),
                 config('warden.history')
             );
         });
 
         $this->app->singleton(AstExtractor::class, function ($app) {
-            return new AstExtractor();
+            return new AstExtractor;
         });
 
         $this->app->singleton(EmbeddingClient::class, function ($app) {
@@ -108,6 +105,8 @@ class WardenServiceProvider extends ServiceProvider
         }
 
         // Register middleware alias
-        $this->app['router']->aliasMiddleware('warden.auth', ValidateWardenSharedKey::class);
+        if ($this->app->bound('router')) {
+            $this->app->make('router')->aliasMiddleware('warden.auth', ValidateWardenSharedKey::class);
+        }
     }
 }

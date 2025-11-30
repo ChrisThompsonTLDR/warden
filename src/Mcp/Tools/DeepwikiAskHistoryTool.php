@@ -2,23 +2,19 @@
 
 namespace Warden\Mcp\Tools;
 
-use Laravel\Mcp\Attributes\McpTool;
 use Warden\Services\BranchManager;
 use Warden\Services\GitHistoryService;
-use Warden\Services\WorktreeManager;
 
-#[McpTool(
-    name: 'deepwiki.ask_history',
-    description: 'Ask questions about Git commit history for a specific repository and branch'
-)]
 class DeepwikiAskHistoryTool
 {
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected GitHistoryService $gitHistoryService
     ) {}
 
+    /**
+     * @return array{success: bool, error?: string, repo?: string, branch?: string, question?: string, filters?: array<string, mixed>, total_matches?: int, commits?: array<int, array{hash: string, author: string, date: string, subject: string, files: array<int, string>}>, stats?: array{total_commits_indexed: int, date_range: array{earliest: string|null, latest: string|null}|null, top_authors: array<string, int>}, note?: string}
+     */
     public function __invoke(
         string $repo,
         string $branch,
@@ -28,11 +24,11 @@ class DeepwikiAskHistoryTool
         ?string $until = null,
         ?string $path = null
     ): array {
-        // Validate the branch exists
-        if (! $this->worktreeManager->worktreeExists($branch)) {
+        // Validate the branch has been indexed
+        if (! $this->branchManager->isBranchIndexed($branch)) {
             return [
                 'success' => false,
-                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan warden:reindex {$branch}' first.",
+                'error' => "Branch '{$branch}' has not been indexed. Switch to that branch and run 'php artisan warden:reindex' first.",
             ];
         }
 
@@ -92,6 +88,9 @@ class DeepwikiAskHistoryTool
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function inputSchema(): array
     {
         return [

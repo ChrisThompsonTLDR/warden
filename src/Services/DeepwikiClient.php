@@ -27,6 +27,9 @@ class DeepwikiClient
 
     /**
      * Ask a question about a project.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
     public function ask(string $projectId, string $question, array $options = []): array
     {
@@ -46,12 +49,15 @@ class DeepwikiClient
 
     /**
      * Trigger a reindex of a project.
+     *
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
      */
-    public function reindex(string $projectId, string $worktreePath, array $options = []): array
+    public function reindex(string $projectId, string $repoPath, array $options = []): array
     {
         $response = $this->http->post('/api/index', [
             'project_id' => $projectId,
-            'repo_path' => $worktreePath,
+            'repo_path' => $repoPath,
             'include_patterns' => $options['include'] ?? [],
             'exclude_patterns' => $options['exclude'] ?? [],
             'force' => $options['force'] ?? false,
@@ -66,6 +72,8 @@ class DeepwikiClient
 
     /**
      * List all indexed projects.
+     *
+     * @return array<string, mixed>
      */
     public function listProjects(): array
     {
@@ -80,6 +88,8 @@ class DeepwikiClient
 
     /**
      * Get project status.
+     *
+     * @return array<string, mixed>
      */
     public function getProjectStatus(string $projectId): array
     {
@@ -120,6 +130,8 @@ class DeepwikiClient
 
     /**
      * Get server info.
+     *
+     * @return array<string, mixed>
      */
     public function getServerInfo(): array
     {

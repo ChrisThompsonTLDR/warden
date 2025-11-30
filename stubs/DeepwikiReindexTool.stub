@@ -6,12 +6,11 @@ use Illuminate\Support\Facades\Artisan;
 use Laravel\Mcp\Attributes\McpTool;
 use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
-use Warden\Services\WorktreeManager;
-
 /**
  * Trigger a reindex of the codebase.
  *
- * This tool creates/updates worktrees, staging databases, and triggers Deepwiki reindexing.
+ * This tool creates staging databases, extracts commit history, and triggers Deepwiki reindexing.
+ * Note: You must be on the branch you want to index (switch with git checkout first).
  *
  * @see AGENTS.md for full documentation
  */
@@ -23,7 +22,6 @@ class DeepwikiReindexTool
 {
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected DeepwikiClient $deepwikiClient
     ) {}
 
@@ -36,9 +34,21 @@ class DeepwikiReindexTool
         $projectId = $this->branchManager->getProjectId($branch);
 
         try {
-            // Run the reindex command
+            // Get current branch (the branch parameter is for validation/display only)
+            $currentBranch = $this->branchManager->getCurrentBranch();
+            
+            // Validate that we're on the requested branch
+            if ($currentBranch !== $branch) {
+                return [
+                    'success' => false,
+                    'error' => "You are currently on branch '{$currentBranch}', but requested to index '{$branch}'. Switch to the branch first: git checkout {$branch}",
+                    'current_branch' => $currentBranch,
+                    'requested_branch' => $branch,
+                ];
+            }
+
+            // Run the reindex command (it will use current branch automatically)
             $exitCode = Artisan::call('warden:reindex', [
-                'branch' => $branch,
                 '--force' => $force,
                 '--skip-history' => $skipHistory,
             ]);
@@ -54,7 +64,7 @@ class DeepwikiReindexTool
             }
 
             // Get paths for response
-            $worktreePath = $this->branchManager->getWorktreePath($branch);
+            $repoPath = $this->branchManager->getRepoPath();
             $indexPath = $this->branchManager->getIndexPath($branch);
             $historyPath = $this->branchManager->getHistoryPath($branch);
 
@@ -63,7 +73,7 @@ class DeepwikiReindexTool
                 'repo' => $repo,
                 'branch' => $branch,
                 'project_id' => $projectId,
-                'worktree_path' => $worktreePath,
+                'repo_path' => $repoPath,
                 'index_path' => $indexPath,
                 'history_path' => $historyPath,
                 'message' => "Successfully reindexed {$repo}/{$branch}",

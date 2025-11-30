@@ -2,34 +2,30 @@
 
 namespace Warden\Mcp\Tools;
 
-use Laravel\Mcp\Attributes\McpTool;
 use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
-use Warden\Services\WorktreeManager;
 
-#[McpTool(
-    name: 'deepwiki.ask',
-    description: 'Ask a question about the codebase for a specific repository and branch'
-)]
 class DeepwikiAskTool
 {
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected DeepwikiClient $deepwikiClient
     ) {}
 
+    /**
+     * @return array{success: bool, error?: string, repo?: string, branch?: string, project_id?: string, question?: string, answer?: string, sources?: array<int, mixed>}
+     */
     public function __invoke(
         string $repo,
         string $branch,
         string $question,
         ?string $model = null
     ): array {
-        // Validate the branch exists
-        if (! $this->worktreeManager->worktreeExists($branch)) {
+        // Validate the branch has been indexed
+        if (! $this->branchManager->isBranchIndexed($branch)) {
             return [
                 'success' => false,
-                'error' => "Branch '{$branch}' has not been indexed. Run 'php artisan warden:reindex {$branch}' first.",
+                'error' => "Branch '{$branch}' has not been indexed. Switch to that branch and run 'php artisan warden:reindex' first.",
             ];
         }
 
@@ -57,6 +53,9 @@ class DeepwikiAskTool
         }
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function inputSchema(): array
     {
         return [

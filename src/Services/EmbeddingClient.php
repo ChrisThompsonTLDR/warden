@@ -2,7 +2,7 @@
 
 namespace Warden\Services;
 
-use Prism\Prism\Prism;
+use Prism\Prism\Facades\Prism;
 
 class EmbeddingClient
 {
@@ -13,7 +13,7 @@ class EmbeddingClient
     /**
      * Generate an embedding vector for the given text.
      *
-     * @return array<float>
+     * @return array<int, float>
      */
     public function embed(string $text): array
     {
@@ -22,7 +22,10 @@ class EmbeddingClient
             ->fromInput($text)
             ->generate();
 
-        return $response->embeddings[0]->embedding;
+        $embedding = $response->embeddings[0]->embedding;
+
+        // Ensure we return array of floats
+        return array_map('floatval', $embedding);
     }
 
     /**

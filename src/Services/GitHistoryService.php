@@ -6,9 +6,11 @@ use Illuminate\Support\Facades\Process;
 
 class GitHistoryService
 {
+    /**
+     * @param  array<string, mixed>  $config
+     */
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected array $config = []
     ) {}
 
@@ -17,19 +19,14 @@ class GitHistoryService
      */
     public function extractHistory(string $branch): string
     {
-        $worktreePath = $this->branchManager->getWorktreePath($branch);
+        $repoPath = $this->branchManager->getRepoPath();
         $historyPath = $this->branchManager->getHistoryPath($branch);
-
-        // Ensure the worktree exists
-        if (! $this->worktreeManager->worktreeExists($branch)) {
-            throw new \RuntimeException("Worktree for branch '{$branch}' does not exist");
-        }
 
         // Ensure history directory exists
         $this->branchManager->ensureDirectory($historyPath);
 
         // Extract commits
-        $commits = $this->getCommits($worktreePath);
+        $commits = $this->getCommits($repoPath);
 
         // Write commits to JSONL file
         $jsonlPath = $historyPath.'/commits.jsonl';
@@ -43,9 +40,11 @@ class GitHistoryService
     }
 
     /**
-     * Get commits from a worktree.
+     * Get commits from the repository.
+     *
+     * @return array<int, array<string, mixed>>
      */
-    protected function getCommits(string $worktreePath): array
+    protected function getCommits(string $repoPath): array
     {
         $maxCommits = $this->config['max_commits'] ?? 1000;
         $includeDiffs = $this->config['include_diffs'] ?? false;
@@ -53,7 +52,7 @@ class GitHistoryService
 
         // Get commit log with structured output
         $format = '%H|%an|%ae|%aI|%s|%b';
-        $result = Process::path($worktreePath)
+        $result = Process::path($repoPath)
             ->run("git log --format=\"{$format}\" -n {$maxCommits} --no-merges");
 
         if (! $result->successful()) {
@@ -83,11 +82,11 @@ class GitHistoryService
             ];
 
             if ($includeDiffs) {
-                $commit['diff'] = $this->getCommitDiff($worktreePath, $commit['hash'], $maxDiffSize);
+                $commit['diff'] = $this->getCommitDiff($repoPath, $commit['hash'], $maxDiffSize);
             }
 
             // Get files changed in this commit
-            $commit['files'] = $this->getCommitFiles($worktreePath, $commit['hash']);
+            $commit['files'] = $this->getCommitFiles($repoPath, $commit['hash']);
 
             $commits[] = $commit;
         }
@@ -98,9 +97,9 @@ class GitHistoryService
     /**
      * Get the diff for a commit.
      */
-    protected function getCommitDiff(string $worktreePath, string $hash, int $maxSize): ?string
+    protected function getCommitDiff(string $repoPath, string $hash, int $maxSize): ?string
     {
-        $result = Process::path($worktreePath)
+        $result = Process::path($repoPath)
             ->run("git show --format='' --stat --patch {$hash}");
 
         if (! $result->successful()) {
@@ -118,10 +117,12 @@ class GitHistoryService
 
     /**
      * Get files changed in a commit.
+     *
+     * @return array<int, array{status: string, path: string}>
      */
-    protected function getCommitFiles(string $worktreePath, string $hash): array
+    protected function getCommitFiles(string $repoPath, string $hash): array
     {
-        $result = Process::path($worktreePath)
+        $result = Process::path($repoPath)
             ->run("git show --format='' --name-status {$hash}");
 
         if (! $result->successful()) {
@@ -135,7 +136,7 @@ class GitHistoryService
             }
 
             $parts = preg_split('/\s+/', $line, 2);
-            if (count($parts) === 2) {
+            if ($parts !== false && count($parts) === 2) {
                 $files[] = [
                     'status' => $parts[0],
                     'path' => $parts[1],
@@ -148,10 +149,15 @@ class GitHistoryService
 
     /**
      * Write commits to JSONL file.
+     *
+     * @param  array<int, array<string, mixed>>  $commits
      */
     protected function writeCommitsToJsonl(array $commits, string $path): void
     {
         $handle = fopen($path, 'w');
+        if ($handle === false) {
+            throw new \RuntimeException("Failed to open file for writing: {$path}");
+        }
 
         foreach ($commits as $commit) {
             fwrite($handle, json_encode($commit)."\n");
@@ -162,14 +168,19 @@ class GitHistoryService
 
     /**
      * Write commits to Markdown file.
+     *
+     * @param  array<int, array<string, mixed>>  $commits
      */
     protected function writeCommitsToMarkdown(array $commits, string $path): void
     {
         $handle = fopen($path, 'w');
+        if ($handle === false) {
+            throw new \RuntimeException("Failed to open file for writing: {$path}");
+        }
 
         fwrite($handle, "# Git Commit History\n\n");
-        fwrite($handle, "Generated: ".date('Y-m-d H:i:s')."\n\n");
-        fwrite($handle, "Total commits: ".count($commits)."\n\n");
+        fwrite($handle, 'Generated: '.date('Y-m-d H:i:s')."\n\n");
+        fwrite($handle, 'Total commits: '.count($commits)."\n\n");
         fwrite($handle, "---\n\n");
 
         foreach ($commits as $commit) {
@@ -197,6 +208,9 @@ class GitHistoryService
 
     /**
      * Search commit history for a branch.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<int, array<string, mixed>>
      */
     public function searchHistory(string $branch, string $query, array $filters = []): array
     {
@@ -209,9 +223,16 @@ class GitHistoryService
 
         $results = [];
         $handle = fopen($jsonlPath, 'r');
+        if ($handle === false) {
+            return [];
+        }
 
         while (($line = fgets($handle)) !== false) {
-            $commit = json_decode(trim($line), true);
+            $decoded = json_decode(trim($line), true);
+            if (! is_array($decoded)) {
+                continue;
+            }
+            $commit = $decoded;
 
             if (! $commit) {
                 continue;
@@ -257,6 +278,8 @@ class GitHistoryService
 
     /**
      * Get history statistics for a branch.
+     *
+     * @return array{total_commits: int, authors: array<string, int>, date_range: array{earliest: string|null, latest: string|null}|null}
      */
     public function getHistoryStats(string $branch): array
     {
@@ -276,13 +299,20 @@ class GitHistoryService
         $totalCommits = 0;
 
         $handle = fopen($jsonlPath, 'r');
+        if ($handle === false) {
+            return [
+                'total_commits' => 0,
+                'authors' => [],
+                'date_range' => null,
+            ];
+        }
 
         while (($line = fgets($handle)) !== false) {
-            $commit = json_decode(trim($line), true);
-
-            if (! $commit) {
+            $decoded = json_decode(trim($line), true);
+            if (! is_array($decoded)) {
                 continue;
             }
+            $commit = $decoded;
 
             $totalCommits++;
             $authors[$commit['author']] = ($authors[$commit['author']] ?? 0) + 1;

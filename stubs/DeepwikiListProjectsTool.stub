@@ -7,8 +7,6 @@ use Warden\Services\BranchManager;
 use Warden\Services\DeepwikiClient;
 use Warden\Services\GitHistoryService;
 use Warden\Services\StagingDatabaseManager;
-use Warden\Services\WorktreeManager;
-
 /**
  * List all Deepwiki projects.
  *
@@ -24,7 +22,6 @@ class DeepwikiListProjectsTool
 {
     public function __construct(
         protected BranchManager $branchManager,
-        protected WorktreeManager $worktreeManager,
         protected StagingDatabaseManager $stagingDbManager,
         protected GitHistoryService $gitHistoryService,
         protected DeepwikiClient $deepwikiClient
@@ -57,10 +54,7 @@ class DeepwikiListProjectsTool
                     'repo' => $repoName,
                     'branch' => $branch,
                     'project_id' => $projectId,
-                    'worktree' => [
-                        'exists' => $this->worktreeManager->worktreeExists($branch),
-                        'path' => $this->branchManager->getWorktreePath($branch),
-                    ],
+                    'indexed' => $this->branchManager->isBranchIndexed($branch),
                     'database' => [
                         'exists' => $this->stagingDbManager->databaseExists($branch),
                         'path' => $this->branchManager->getStagingDatabasePath($branch),

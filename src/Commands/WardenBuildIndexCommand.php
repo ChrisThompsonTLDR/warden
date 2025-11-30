@@ -17,11 +17,10 @@ use function Laravel\Prompts\warning;
 class WardenBuildIndexCommand extends Command
 {
     protected $signature = 'warden:build-index 
-                            {branch? : The branch to index (defaults to current branch)}
                             {--path= : Custom path to index (defaults to project root)}
                             {--skip-embeddings : Skip generating embeddings (index AST only)}';
 
-    protected $description = 'Build Warden AST + embedding index for a branch';
+    protected $description = 'Build Warden AST + embedding index for current git branch';
 
     public function __construct(
         protected BranchManager $branchManager,
@@ -33,8 +32,9 @@ class WardenBuildIndexCommand extends Command
 
     public function handle(): int
     {
-        $branch = $this->argument('branch') ?? $this->branchManager->getCurrentBranch();
-        $projectRoot = $this->option('path') ?? base_path();
+        $branch = $this->branchManager->getCurrentBranch();
+        $pathOption = $this->option('path');
+        $projectRoot = is_string($pathOption) ? $pathOption : base_path();
         $indexRoot = $this->branchManager->getIndexPath($branch);
 
         info("🔨 Building index for branch: {$branch}");
@@ -74,6 +74,9 @@ class WardenBuildIndexCommand extends Command
 
         foreach ($files as $file) {
             $filePath = $file->getRealPath();
+            if ($filePath === false) {
+                continue;
+            }
             $relPath = ltrim(str_replace($projectRoot, '', $filePath), DIRECTORY_SEPARATOR);
             $code = $file->getContents();
 
@@ -180,7 +183,7 @@ class WardenBuildIndexCommand extends Command
      */
     protected function createFileFinder(string $projectRoot): Finder
     {
-        $finder = (new Finder())
+        $finder = (new Finder)
             ->files()
             ->in($projectRoot)
             ->name('*.php');
@@ -203,6 +206,8 @@ class WardenBuildIndexCommand extends Command
 
     /**
      * Display the build summary.
+     *
+     * @param  array<string>  $errors
      */
     protected function displaySummary(
         string $branch,
