@@ -80,6 +80,7 @@ return [
         'exclude' => [
             'node_modules',
             '.git',
+            '.warden',
             'storage/logs',
             'storage/framework/cache',
             'bootstrap/cache',
