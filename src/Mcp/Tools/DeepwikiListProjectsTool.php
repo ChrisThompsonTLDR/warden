@@ -1,0 +1,103 @@
+<?php
+
+namespace Warden\Mcp\Tools;
+
+use Warden\Services\BranchManager;
+use Warden\Services\DeepwikiClient;
+use Warden\Services\GitHistoryService;
+use Warden\Services\StagingDatabaseManager;
+
+class DeepwikiListProjectsTool
+{
+    public function __construct(
+        protected BranchManager $branchManager,
+        protected StagingDatabaseManager $stagingDbManager,
+        protected GitHistoryService $gitHistoryService,
+        protected DeepwikiClient $deepwikiClient
+    ) {}
+
+    /**
+     * @return array{success: bool, error?: string, repo?: string, deepwiki_available?: bool, projects?: array<int, array<string, mixed>>, total?: int}
+     */
+    public function __invoke(?string $repo = null): array
+    {
+        try {
+            // Get local branches with Warden data
+            $localBranches = $this->branchManager->listBranches();
+
+            // Get Deepwiki projects
+            $deepwikiProjects = [];
+            if ($this->deepwikiClient->health()) {
+                try {
+                    $deepwikiProjects = $this->deepwikiClient->listProjects();
+                } catch (\Exception $e) {
+                    // Deepwiki might not have projects endpoint
+                }
+            }
+
+            // Build project list
+            $projects = [];
+            $repoName = $repo ?? config('warden.repo_name');
+
+            foreach ($localBranches as $branch) {
+                $projectId = $this->branchManager->getProjectId($branch);
+
+                $project = [
+                    'repo' => $repoName,
+                    'branch' => $branch,
+                    'project_id' => $projectId,
+                    'indexed' => $this->branchManager->isBranchIndexed($branch),
+                    'database' => [
+                        'exists' => $this->stagingDbManager->databaseExists($branch),
+                        'path' => $this->branchManager->getStagingDatabasePath($branch),
+                        'size' => $this->stagingDbManager->getDatabaseSize($branch),
+                    ],
+                    'history' => [
+                        'exists' => file_exists($this->branchManager->getHistoryPath($branch).'/commits.jsonl'),
+                        'path' => $this->branchManager->getHistoryPath($branch),
+                    ],
+                    'index' => [
+                        'path' => $this->branchManager->getIndexPath($branch),
+                    ],
+                ];
+
+                // Add Deepwiki status if available
+                if (isset($deepwikiProjects[$projectId])) {
+                    $project['deepwiki_status'] = $deepwikiProjects[$projectId];
+                }
+
+                $projects[] = $project;
+            }
+
+            return [
+                'success' => true,
+                'repo' => $repoName,
+                'deepwiki_available' => $this->deepwikiClient->health(),
+                'projects' => $projects,
+                'total' => count($projects),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'repo' => [
+                    'type' => 'string',
+                    'description' => 'Optional: filter by repository name',
+                ],
+            ],
+            'required' => [],
+        ];
+    }
+}

@@ -1,0 +1,66 @@
+{
+    "name": "christhompsontldr/warden",
+    "description": "Laravel package integrating Deepwiki-Open with MCP for AI-powered codebase analysis",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "laravel",
+        "deepwiki",
+        "mcp",
+        "ai",
+        "codebase-analysis",
+        "rag"
+    ],
+    "authors": [
+        {
+            "name": "Chris Thompson",
+            "email": "chris@christhompsontldr.com"
+        }
+    ],
+    "homepage": "https://github.com/ChrisThompsonTLDR/warden",
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^12.0",
+        "illuminate/console": "^12.0",
+        "illuminate/http": "^12.0",
+        "illuminate/process": "^12.0",
+        "laravel/mcp": "^0.3",
+        "nikic/php-parser": "^5.0",
+        "prism-php/prism": "^0.98"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.26",
+        "orchestra/testbench": "^10.8",
+        "pestphp/pest": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Warden\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Warden\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Warden\\WardenServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    }
+}

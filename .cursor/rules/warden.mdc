@@ -1,0 +1,121 @@
+---
+description: Warden - Deepwiki + MCP Integration for AI-Powered Codebase Analysis
+globs:
+  - "**/*.php"
+  - "config/warden.php"
+  - ".warden/**/*"
+alwaysApply: true
+---
+
+# Warden Rules for Cursor
+
+This file configures Cursor to understand the Warden package and its conventions.
+
+## Overview
+
+Warden integrates Deepwiki-Open with Laravel's MCP to provide AI-powered codebase analysis.
+
+## Directory Structure
+
+```
+.warden/
+├── worktrees/<branch>/     # Git worktree checkouts per branch
+├── <branch>/database/      # Branch-specific staging SQLite databases
+├── <branch>/index/         # FAISS vector indexes per branch
+└── <branch>/history/       # Git commit history for RAG
+```
+
+## MCP Tools Available
+
+When using this codebase, you have access to these MCP tools:
+
+1. **deepwiki.ask** - Ask questions about code for a specific branch
+2. **deepwiki.ask_history** - Ask questions about commit history
+3. **deepwiki.reindex_project** - Trigger reindexing for a branch
+4. **deepwiki.list_projects** - List all indexed branches
+
+## Branch-Aware Development
+
+- Each branch has isolated: worktree, staging DB, index, history
+- Branch names are sanitized: `feature/2fa` → `feature-2fa`
+- Project IDs: `<repo>-<branch>` (e.g., `myapp-main`)
+
+## Staging Database Convention
+
+SQLite staging databases are stored at:
+```
+.warden/<branch>/database/staging.sqlite
+```
+
+Use these for:
+- Deterministic analysis
+- Safe testing without affecting production
+- Branch-isolated data
+
+## Authentication
+
+The `WARDEN_SHARED_KEY` environment variable protects MCP endpoints.
+Always include it when making MCP requests:
+- Header: `X-Warden-Key: <key>`
+- Query: `?warden_key=<key>`
+- Bearer: `Authorization: Bearer <key>`
+
+## Indexing Commands
+
+```bash
+# Index current branch
+php artisan warden:reindex
+
+# Index specific branch
+php artisan warden:reindex main
+
+# Force reindex
+php artisan warden:reindex --force
+
+# Check status
+php artisan warden:status
+```
+
+## Configuration
+
+Key config in `config/warden.php`:
+- `deepwiki_server_url` - Deepwiki server URL
+- `shared_key` - MCP authentication key
+- `repo_name` - Repository identifier
+- `warden_root` - Root directory for Warden data
+- `indexing.include` - Directories to include in indexing
+- `indexing.exclude` - Directories to exclude
+
+## Code Conventions
+
+### Services
+
+- `BranchManager` - Manages branch paths and project IDs
+- `WorktreeManager` - Creates/updates Git worktrees
+- `StagingDatabaseManager` - Manages branch-specific SQLite DBs
+- `DeepwikiClient` - HTTP client for Deepwiki API
+- `GitHistoryService` - Extracts and indexes commit history
+
+### MCP Tools
+
+Tools are in `src/Mcp/Tools/` and use the `#[McpTool]` attribute:
+
+```php
+#[McpTool(
+    name: 'deepwiki.ask',
+    description: 'Ask a question about the codebase'
+)]
+class DeepwikiAskTool
+{
+    public function __invoke(string $repo, string $branch, string $question): array
+    {
+        // Implementation
+    }
+}
+```
+
+## See Also
+
+- Full documentation: `AGENTS.md`
+- Configuration: `config/warden.php`
+- Docker setup: `docker-compose.warden.yml`

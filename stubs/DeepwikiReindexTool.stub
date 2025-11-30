@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Mcp\Tools;
+
+use Illuminate\Support\Facades\Artisan;
+use Laravel\Mcp\Attributes\McpTool;
+use Warden\Services\BranchManager;
+use Warden\Services\DeepwikiClient;
+/**
+ * Trigger a reindex of the codebase.
+ *
+ * This tool creates staging databases, extracts commit history, and triggers Deepwiki reindexing.
+ * Note: You must be on the branch you want to index (switch with git checkout first).
+ *
+ * @see AGENTS.md for full documentation
+ */
+#[McpTool(
+    name: 'deepwiki.reindex_project',
+    description: 'Trigger a full reindex of the codebase for a specific repository and branch'
+)]
+class DeepwikiReindexTool
+{
+    public function __construct(
+        protected BranchManager $branchManager,
+        protected DeepwikiClient $deepwikiClient
+    ) {}
+
+    public function __invoke(
+        string $repo,
+        string $branch,
+        bool $force = false,
+        bool $skipHistory = false
+    ): array {
+        $projectId = $this->branchManager->getProjectId($branch);
+
+        try {
+            // Get current branch (the branch parameter is for validation/display only)
+            $currentBranch = $this->branchManager->getCurrentBranch();
+            
+            // Validate that we're on the requested branch
+            if ($currentBranch !== $branch) {
+                return [
+                    'success' => false,
+                    'error' => "You are currently on branch '{$currentBranch}', but requested to index '{$branch}'. Switch to the branch first: git checkout {$branch}",
+                    'current_branch' => $currentBranch,
+                    'requested_branch' => $branch,
+                ];
+            }
+
+            // Run the reindex command (it will use current branch automatically)
+            $exitCode = Artisan::call('warden:reindex', [
+                '--force' => $force,
+                '--skip-history' => $skipHistory,
+            ]);
+
+            $output = Artisan::output();
+
+            if ($exitCode !== 0) {
+                return [
+                    'success' => false,
+                    'error' => 'Reindex command failed',
+                    'output' => $output,
+                ];
+            }
+
+            // Get paths for response
+            $repoPath = $this->branchManager->getRepoPath();
+            $indexPath = $this->branchManager->getIndexPath($branch);
+            $historyPath = $this->branchManager->getHistoryPath($branch);
+
+            return [
+                'success' => true,
+                'repo' => $repo,
+                'branch' => $branch,
+                'project_id' => $projectId,
+                'repo_path' => $repoPath,
+                'index_path' => $indexPath,
+                'history_path' => $historyPath,
+                'message' => "Successfully reindexed {$repo}/{$branch}",
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    public static function inputSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'repo' => [
+                    'type' => 'string',
+                    'description' => 'The logical repository name',
+                ],
+                'branch' => [
+                    'type' => 'string',
+                    'description' => 'The Git branch name to reindex',
+                ],
+                'force' => [
+                    'type' => 'boolean',
+                    'description' => 'Force reindex even if index exists',
+                    'default' => false,
+                ],
+                'skipHistory' => [
+                    'type' => 'boolean',
+                    'description' => 'Skip indexing commit history',
+                    'default' => false,
+                ],
+            ],
+            'required' => ['repo', 'branch'],
+        ];
+    }
+}
